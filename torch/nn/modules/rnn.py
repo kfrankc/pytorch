@@ -111,6 +111,10 @@ class RNNBase(Module):
 
         self._data_ptrs = list(p.data.data_ptr() for p in self.parameters())
 
+    def __setstate__(self, state):
+        super(RNNBase, self).__setstate__(state)
+        self.__dict__.setdefault('_data_ptrs', [])
+
     def _apply(self, fn):
         ret = super(RNNBase, self)._apply(fn)
         self.flatten_parameters()

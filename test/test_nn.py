@@ -2741,12 +2741,12 @@ class TestNN(NNTestCase):
                                 "\ndilation: " + str(dilation))
 
     def test_conv_double_backward_no_bias(self):
-        kern = 2
+        kern = 3
         stride = 2
-        chan_in, chan_out = 1, 1 # 2, 4
-        batch_size = 1
-        inp_size = 3
-        padding = 0
+        chan_in, chan_out = 2, 4
+        batch_size = 2
+        inp_size = 5
+        padding = 1
         dilation = 1
         no_weight = False
         use_bias = True

@@ -445,29 +445,16 @@ auto ConvBackwardBackward::apply(const variable_list& grad_grad_inputs) -> varia
     }
   }
 
-  // Compute gW = conv(gO, ggI)
+  // Compute gW = conv(ggI, gO)
   std::shared_ptr<Variable> gW = nullptr;
   if (ggI) {
     // Modified params with correct padding
     ConvParams gw_conv_params(*this);
+
     // Disable groups as they are handled separately
     auto groups = gw_conv_params.groups;
     gw_conv_params.groups = 1;
-    auto weight_size = weight->data->sizes();
-    std::vector<long> kernel_size(weight_size.begin() + 2, weight_size.end());
-    auto input_size = input->data->sizes();
-    std::vector<long> input_shape(input_size.begin() + 2, input_size.end());
-    for(size_t i = 0; i < gw_conv_params.padding.size(); ++i) {
-      // Check if whole input has been used or not
-      auto remainder = (input_shape[i]
-                        + 2 * gw_conv_params.padding[i]
-                        - (gw_conv_params.dilation[i] * (kernel_size[i] - 1) + 1)
-                        + gw_conv_params.stride[i]) % gw_conv_params.stride[i];
-      if (remainder != 0) {
-        auto used_input_size = input_shape[i] - remainder;
-        ggI = Narrow(i + 2, 0, used_input_size).apply({ggI})[0];
-      }
-    }
+
     std::swap(gw_conv_params.dilation, gw_conv_params.stride);
 
     // Transpose gO and ggI to accumulate over batch
@@ -500,6 +487,17 @@ auto ConvBackwardBackward::apply(const variable_list& grad_grad_inputs) -> varia
 
     // Transpose gW to match chan_in and chan_out
     gW = Transpose(0, 1).apply({gWt})[0];
+
+    // narrow gW to only relevant portion
+    // we do it this way instead of narrowing the input itself because
+    // the ConvForward kernels don't support asymmetric padding.
+    auto gW_size = gW->data->sizes();
+    auto w_size = weight->data->sizes();
+    for(size_t i = 2; i < gW_size.size(); ++i) {
+      if (gW_size[i] > w_size[i]) {
+        gW = Narrow(i, 0, w_size[i]).apply({gW})[0];
+      }
+    }
   }
 
   // Compute gI = convT(gO, ggW)

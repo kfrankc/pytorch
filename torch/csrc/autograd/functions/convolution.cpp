@@ -509,24 +509,35 @@ auto ConvBackwardBackward::apply(const variable_list& grad_grad_inputs) -> varia
     ConvParams gi_conv_params(*this);
     gi_conv_params.transposed = true;
 
+    // swap stride and dilation
+    std::swap(gi_conv_params.dilation, gi_conv_params.stride);
+
     // calculate output_padding
     auto weight_size = weight->data->sizes();
     std::vector<long> kernel_size(weight_size.begin() + 2, weight_size.end());
     auto input_size = input->data->sizes();
     std::vector<long> input_shape(input_size.begin() + 2, input_size.end());
-    for(size_t i = 0; i < gi_conv_params.padding.size(); ++i) {
-      // Check if whole input has been used or not
-      auto remainder = (input_shape[i]
-                        + 2 * gi_conv_params.padding[i]
-                        - (gi_conv_params.dilation[i] * (kernel_size[i] - 1) + 1)
-                        + gi_conv_params.stride[i]) % gi_conv_params.stride[i];
-      if (remainder != 0) {
-        gi_conv_params.output_padding[i] = remainder;
+    auto grad_output_size = gO->data->sizes();
+    std::vector<long> grad_output_shape(grad_output_size.begin() + 2, grad_output_size.end());
+
+    if (kernel_size.size() == 1) {
+      auto expected_input_shape = (kernel_size[0] - 1) * gi_conv_params.stride[1]
+          - 2 * gi_conv_params.padding[1]
+          + (gi_conv_params.dilation[1] * (grad_output_shape[0] - 1) + 1);
+      if (expected_input_shape != input_shape[0]) {
+          gi_conv_params.output_padding[1] = input_shape[0] - expected_input_shape;
+      }
+    } else {
+      for(size_t i = 0; i < kernel_size.size(); ++i) {
+        // Check if whole input has been used or not
+        auto expected_input_shape = (kernel_size[i] - 1) * gi_conv_params.stride[i]
+          - 2 * gi_conv_params.padding[i]
+          + (gi_conv_params.dilation[i] * (grad_output_shape[i] - 1) + 1);
+        if (expected_input_shape != input_shape[i]) {
+          gi_conv_params.output_padding[i] = input_shape[i] - expected_input_shape;
+        }
       }
     }
-
-    // swap stride and dilation
-    std::swap(gi_conv_params.dilation, gi_conv_params.stride);
 
     // Disable groups as they are handled separately
     auto groups = gi_conv_params.groups;

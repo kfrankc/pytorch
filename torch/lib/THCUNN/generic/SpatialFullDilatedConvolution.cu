@@ -16,9 +16,6 @@ static inline void THNN_(SpatialFullDilatedConvolution_shapeCheck)(
   THArgCheck(dilationW > 0 && dilationH > 0, 15,
              "dilation should be greater than zero, but got dilationH: %d, dilationW: %d",
              dilationH, dilationW);
-  THArgCheck((adjW < dW || adjW < dilationW) && (adjH < dH || adjH < dilationH), 15,
-             "output padding must be smaller than either stride or dilation, but got adjH: %d adjW: %d dH: %d dW: %d dilationH: %d dilationW: %d",
-             adjH, adjW, dH, dW, dilationH, dilationW);
   THArgCheck(THCTensor_(isContiguous)(state, weight), 4,
              "weight tensor has to be contiguous");
   THArgCheck(!bias || THCTensor_(isContiguous)(state, bias), 5,
@@ -160,7 +157,7 @@ void THNN_(SpatialFullDilatedConvolution_updateOutput)(
     col2im<real, accreal>(
       THCState_getCurrentStream(state),
       THCTensor_(data)(state, columns),
-      nOutputPlane, outputHeight, outputWidth, kH, kW, padH, padW, dH, dW,
+      nOutputPlane, outputHeight, outputWidth, inputHeight, inputWidth, kH, kW, padH, padW, dH, dW,
       dilationH, dilationW, THCTensor_(data)(state, output_n)
     );
 
